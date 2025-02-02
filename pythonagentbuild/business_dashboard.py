@@ -81,6 +81,73 @@ with st.sidebar:
     # Move File Upload to Sidebar (Global Scope)
     uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
 
+# --- SECTION 1: File Upload ---
+if selected_section == "📂 Upload Data":
+    st.title("📂 Upload Business Data")
+
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file, engine="openpyxl")
+            st.success("✅ File uploaded successfully!")
+            st.write(df.head())
+        except Exception as e:
+            st.error(f"❌ Failed to load Excel file. Error: {str(e)}")
+
+# --- SECTION 2: Revenue Forecast & KPIs ---
+if selected_section == "📊 Revenue Forecast & KPIs":
+    st.title("📊 Revenue Forecast & Key Metrics")
+
+    if uploaded_file:
+        df = pd.read_excel(uploaded_file, engine="openpyxl")
+        
+        if 'Revenue' in df.columns:
+            df = df.dropna(subset=['Revenue'])
+            df['Revenue'] = pd.to_numeric(df['Revenue'], errors='coerce')
+            df["Month"] = np.arange(len(df))
+
+            from sklearn.linear_model import LinearRegression
+            X = df[["Month"]]
+            y = df["Revenue"]
+            model = LinearRegression()
+            model.fit(X, y)
+
+            future_months = np.arange(len(df), len(df) + 6).reshape(-1, 1)
+            predicted_revenue = model.predict(future_months)
+            forecast_df = pd.DataFrame({"Month": future_months.flatten(), "Predicted Revenue": predicted_revenue})
+
+            # --- KPI Section ---
+            st.subheader("📌 Key Performance Indicators (KPIs)")
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("📈 Total Revenue", f"${df['Revenue'].sum():,.2f}")
+
+            with col2:
+                st.metric("📊 Highest Revenue Month", f"Month {df['Revenue'].idxmax()}")
+
+            with col3:
+                st.metric("📉 Average Monthly Revenue", f"${df['Revenue'].mean():,.2f}")
+
+            # --- Plot Forecast ---
+            st.subheader("📈 Revenue Forecast (Next 6 Months)")
+            fig = px.line(
+                x=list(df["Month"]) + list(future_months.flatten()), 
+                y=list(df["Revenue"]) + list(predicted_revenue), 
+                labels={"x": "Month", "y": "Revenue"},
+                title="Revenue Trend & Forecast",
+                markers=True
+            )
+            fig.add_scatter(x=df["Month"], y=df["Revenue"], mode="markers", name="Actual Revenue")
+            st.plotly_chart(fig)
+
+            st.write(forecast_df)
+
+        else:
+            st.warning("The uploaded file must contain a 'Revenue' column.")
+
+    else:
+        st.warning("📂 Please upload a file first in the 'Upload Data' section.")
+
 # --- SECTION 3: AI Chat Assistant (Enhanced UI) ---
 if selected_section == "🤖 AI Chat Assistant":
     st.title("🤖 AI Chat Assistant (RAG)")
@@ -109,12 +176,12 @@ if selected_section == "🤖 AI Chat Assistant":
                 
                 # Store in chat history with timestamp
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.session_state.chat_history.append(("🧑‍💼 You", user_question, timestamp))
-                st.session_state.chat_history.append(("🤖 AI", response.choices[0].message.content, timestamp))
+                st.session_state.chat_history.append(("user", "🧑‍💼 You", user_question, timestamp))
+                st.session_state.chat_history.append(("ai", "🤖 AI", response.choices[0].message.content, timestamp))
 
-    # Display Chat History with Timestamps
+    # Display Chat History with Correct Icons
     st.subheader("📜 Chat History")
-    for sender, message, timestamp in st.session_state.chat_history:
-        with st.chat_message(sender):
+    for role, sender, message, timestamp in st.session_state.chat_history:
+        with st.chat_message(role):  # Use Streamlit's built-in role formatting
             st.write(f"**{sender}** ({timestamp})")
             st.write(message)
