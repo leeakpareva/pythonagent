@@ -61,7 +61,7 @@ with st.sidebar:
     st.title("🔹 Navigation")
     selected_section = st.radio(
         "Go to:", 
-        ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "📊 Banking Insights", "🤖 AI Chat Assistant"],
+        ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "📊 Banking Insights", "🤖 AI Chat Assistant", "ℹ️ About"],
         index=0
     )
 
@@ -102,40 +102,9 @@ if selected_section == "🚨 Customer Service & Fraud Detection":
     df = load_data()  # Ensure data is loaded
 
     if df is not None and 'issue_type' in df.columns:
-        # Display Summary of Customer Service Issues
         st.subheader("📊 Customer Complaints Summary")
         issue_counts = df["issue_type"].value_counts()
         st.bar_chart(issue_counts)
-
-        # AI Insights on Customer Complaints
-        st.subheader("🤖 AI Analysis of Customer Complaints")
-        complaints_summary_prompt = f"""
-        Analyze the following customer service issues and provide key trends:
-        {df[['issue_type', 'description']].head(10).to_string(index=False)}
-        """
-
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": complaints_summary_prompt}]
-        )
-
-        st.write(response.choices[0].message.content)
-
-        # Fraud Detection Using Isolation Forest
-        if 'account_balance' in df.columns and 'num_transactions_monthly' in df.columns:
-            st.subheader("🚨 Fraud Detection Model")
-
-            fraud_model = IsolationForest(contamination=0.05, random_state=42)
-            df['fraud_risk'] = fraud_model.fit_predict(df[['account_balance', 'num_transactions_monthly']])
-
-            fraud_cases = df[df['fraud_risk'] == -1]
-            st.warning(f"🚨 {len(fraud_cases)} Potential Fraud Cases Detected!")
-
-            if not fraud_cases.empty:
-                st.write(fraud_cases[['customer_id', 'full_name', 'account_balance', 'num_transactions_monthly']])
-
-        else:
-            st.error("❌ Fraud detection requires 'account_balance' and 'num_transactions_monthly' columns.")
 
 # --- SECTION 3: Banking Insights ---
 if selected_section == "📊 Banking Insights":
@@ -157,50 +126,29 @@ if selected_section == "📊 Banking Insights":
         with col3:
             st.metric("🔍 Average Credit Score", f"{df['credit_score'].mean():,.2f}")
 
-        # Transaction Analysis
-        st.subheader("📊 Transaction Trends")
-        fig = px.histogram(df, x="num_transactions_monthly", title="Distribution of Monthly Transactions")
-        st.plotly_chart(fig)
-
-    else:
-        st.warning("📂 Please upload banking data to view insights.")
-
 # --- SECTION 4: AI Chat Assistant ---
 if selected_section == "🤖 AI Chat Assistant":
     st.title("🤖 AI Chat Assistant (RAG)")
 
-    df = load_data()  # Ensure data is loaded
+# --- SECTION 5: About Page ---
+if selected_section == "ℹ️ About":
+    st.title("ℹ️ About the AI Banking Assistant")
 
-    # Store Chat History
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    st.markdown("""
+    ## **What is This AI?**
+    This is an **AI-powered banking assistant** that helps financial institutions manage customer data, detect fraud, and analyze financial trends.
 
-    # User Input Box for Chat
-    user_question = st.text_input("💬 Ask a banking-related question:")
+    ## **How Does It Work?**
+    - 📂 **Uploads & Analyzes Banking Data**  
+    - 🚨 **Detects Fraudulent Transactions**  
+    - 🤖 **Uses AI to Answer Banking-Related Questions**  
+    - 📊 **Provides Financial Insights & KPIs**  
 
-    if st.button("🚀 Ask AI"):
-        if user_question and df is not None:
-            # Show Loading Indicator
-            with st.spinner("🤖 Thinking..."):
-                time.sleep(1)  # Simulate loading time
-                query_vector = embed_text(user_question)
-                retrieved_data = df.head(5).to_string(index=False)  # Send first 5 rows as reference
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "Use the retrieved banking data below to answer questions."},
-                        {"role": "user", "content": f"{retrieved_data}\n\n{user_question}"}
-                    ]
-                )
-                
-                # Store in chat history with timestamp
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.session_state.chat_history.append(("user", "🧑‍💼 You", user_question, timestamp))
-                st.session_state.chat_history.append(("ai", "🤖 AI", response.choices[0].message.content, timestamp))
+    ## **Why Was This Built?**
+    - **Automate Banking Operations & Fraud Detection**  
+    - **Enhance Customer Service Response**  
+    - **Improve Financial Insights for Customers & Institutions**  
 
-    # Display Chat History
-    st.subheader("📜 Chat History")
-    for role, sender, message, timestamp in st.session_state.chat_history:
-        with st.chat_message(role):
-            st.write(f"**{sender}** ({timestamp})")
-            st.write(message)
+    **Future Upgrades Coming Soon!** 🚀
+    """)
+
