@@ -4,9 +4,10 @@ import numpy as np
 import plotly.express as px
 import openai
 import faiss
+import os
 
-# OpenAI API Key (Replace with your actual key)
-OPENAI_API_KEY = "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"
+# Get OpenAI API key securely from Streamlit Secrets
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # FAISS Setup (Using OpenAI Embeddings)
@@ -117,3 +118,4 @@ if st.button("Ask AI"):
         st.write(response.choices[0].message.content)
     else:
         st.warning("Please enter a question before clicking 'Ask AI'.")
+
