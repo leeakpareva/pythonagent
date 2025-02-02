@@ -73,7 +73,7 @@ if authentication_status:
         st.title("🔹 Navigation")
         selected_section = st.radio(
             "Go to:", 
-            ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "📊 Banking Insights", "🤖 AI Chat Assistant", "ℹ️ About"],
+            ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "📊 Banking Insights", "🚨 Transaction Monitoring & Fraud Alerts", "🤖 AI Chat Assistant", "ℹ️ About"],
             index=0
         )
 
@@ -115,11 +115,38 @@ if authentication_status:
     if selected_section == "📊 Banking Insights":
         st.title("📊 AI-Powered Banking Analytics")
 
-    # --- SECTION 4: AI Chat Assistant ---
+    # --- SECTION 4: Transaction Monitoring & Fraud Alerts ---
+    if selected_section == "🚨 Transaction Monitoring & Fraud Alerts":
+        st.title("🚨 AI-Powered Transaction Monitoring")
+
+        df = load_data()  # Ensure data is loaded
+
+        if df is not None and 'account_balance' in df.columns and 'num_transactions_monthly' in df.columns:
+            st.subheader("📊 Transaction Risk Analysis")
+
+            # Fraud Detection Using Isolation Forest
+            fraud_model = IsolationForest(contamination=0.05, random_state=42)
+            df['fraud_risk'] = fraud_model.fit_predict(df[['account_balance', 'num_transactions_monthly']])
+
+            fraud_cases = df[df['fraud_risk'] == -1]
+            st.warning(f"🚨 {len(fraud_cases)} Potential Fraud Cases Detected!")
+
+            if not fraud_cases.empty:
+                st.write(fraud_cases[['customer_id', 'full_name', 'account_balance', 'num_transactions_monthly']])
+
+            # Show Transactions Trends
+            st.subheader("📊 Transaction Trends")
+            fig = px.line(df, x="num_transactions_monthly", y="account_balance", title="Account Balance vs. Monthly Transactions")
+            st.plotly_chart(fig)
+
+        else:
+            st.warning("📂 Please upload banking data that includes 'account_balance' and 'num_transactions_monthly'.")
+
+    # --- SECTION 5: AI Chat Assistant ---
     if selected_section == "🤖 AI Chat Assistant":
         st.title("🤖 AI Chat Assistant (RAG)")
 
-    # --- SECTION 5: About Page ---
+    # --- SECTION 6: About Page ---
     if selected_section == "ℹ️ About":
         st.title("ℹ️ About the AI Banking Assistant")
 
