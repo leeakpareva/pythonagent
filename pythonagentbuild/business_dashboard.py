@@ -27,6 +27,52 @@ def embed_text(text):
     )
     return np.array(response.data[0].embedding, dtype=np.float32)
 
+# Function to Rank & Retrieve Top Business Data
+from openai.embeddings_utils import cosine_similarity
+
+def get_most_relevant_data(query_vector, knowledge_base, top_n=3):
+    """Retrieve the most relevant business data based on similarity ranking."""
+    if len(knowledge_base) == 0:
+        return ["No relevant data available. Please upload a dataset."]
+    
+    similarities = [(cosine_similarity(query_vector, vec), text) for text, vec in knowledge_base.items()]
+    similarities = sorted(similarities, key=lambda x: x[0], reverse=True)  # Sort by highest similarity
+    return [text for _, text in similarities[:top_n]]  # Return top matches
+
+# Function to Generate AI Response
+def generate_ai_response(question, retrieved_data):
+    """Generates a structured AI response using retrieved business data."""
+    system_prompt = """
+    You are a business analyst. Use the retrieved data to provide structured insights:
+    
+    1️⃣ **Key Business Insights**
+    2️⃣ **Trend Analysis & Predictions**
+    3️⃣ **Actionable Strategies & Recommendations**
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Data: {retrieved_data}\n\nQuestion: {question}"}
+        ]
+    )
+    return response.choices[0].message.content
+
+# Function to Summarize Uploaded Data
+def summarize_uploaded_data(df):
+    """Summarizes uploaded business data and injects it into AI responses."""
+    summary_prompt = f"""
+    Summarize this business data with key trends, anomalies, and strategic insights:
+    {df.head(10).to_string(index=False)}
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": summary_prompt}]
+    )
+    return response.choices[0].message.content
+
 # --- UI Sidebar Navigation ---
 st.set_page_config(page_title="CEO Business Dashboard", layout="wide")
 
@@ -50,6 +96,12 @@ if selected_section == "📂 Upload Data":
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             st.success("✅ File uploaded successfully!")
             st.write(df.head())
+
+            # Summarize and Display Data Insights
+            summary = summarize_uploaded_data(df)
+            st.subheader("📊 Data Insights Summary")
+            st.write(summary)
+
         except Exception as e:
             st.error(f"❌ Failed to load Excel file. Error: {str(e)}")
 
@@ -100,15 +152,9 @@ if selected_section == "💬 AI Chat Assistant":
     if st.button("Ask AI"):
         if user_question:
             query_vector = embed_text(user_question)
-            retrieved_data = "No relevant data found in uploaded files." if index.ntotal == 0 else list(knowledge_base.keys())[0]
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Use the retrieved data below to answer questions."},
-                    {"role": "user", "content": f"{retrieved_data}\n\n{user_question}"}
-                ]
-            )
+            retrieved_data = get_most_relevant_data(query_vector, knowledge_base, top_n=3)
+            response = generate_ai_response(user_question, retrieved_data)
             st.subheader("🤖 AI Response:")
-            st.write(response.choices[0].message.content)
+            st.write(response)
         else:
             st.warning("Please enter a question before clicking 'Ask AI'.")
