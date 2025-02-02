@@ -30,15 +30,13 @@ def embed_text(text):
     )
     return np.array(response.data[0].embedding, dtype=np.float32)
 
-# --- Dark Mode & Theme Customization ---
+# --- Dark Mode Fix & Theme Customization ---
 st.set_page_config(page_title="AI Banking Assistant", layout="wide")
 
-# Dark Mode Toggle
-dark_mode = st.sidebar.checkbox("🌙 Enable Dark Mode")
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-if dark_mode:
+if st.sidebar.checkbox("🌙 Enable Dark Mode", value=st.session_state.dark_mode):
     st.session_state.dark_mode = True
 else:
     st.session_state.dark_mode = False
@@ -55,6 +53,7 @@ theme_css = """
         }
     </style>
 """ if st.session_state.dark_mode else ""
+
 st.markdown(theme_css, unsafe_allow_html=True)
 
 # --- UI Sidebar Navigation ---
@@ -62,7 +61,7 @@ with st.sidebar:
     st.title("🔹 Navigation")
     selected_section = st.radio(
         "Go to:", 
-        ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "🤖 AI Chat Assistant"],
+        ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "📊 Banking Insights", "🤖 AI Chat Assistant"],
         index=0
     )
 
@@ -138,10 +137,35 @@ if selected_section == "🚨 Customer Service & Fraud Detection":
         else:
             st.error("❌ Fraud detection requires 'account_balance' and 'num_transactions_monthly' columns.")
 
-    else:
-        st.warning("📂 Please upload a valid dataset with customer service issues.")
+# --- SECTION 3: Banking Insights ---
+if selected_section == "📊 Banking Insights":
+    st.title("📊 AI-Powered Banking Analytics")
 
-# --- SECTION 3: AI Chat Assistant (Enhanced UI) ---
+    df = load_data()  # Ensure data is loaded
+
+    if df is not None:
+        st.subheader("📌 Key Banking Metrics")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("💰 Total Deposits", f"${df['account_balance'].sum():,.2f}")
+
+        with col2:
+            st.metric("📊 Average Monthly Transactions", f"{df['num_transactions_monthly'].mean():,.2f}")
+
+        with col3:
+            st.metric("🔍 Average Credit Score", f"{df['credit_score'].mean():,.2f}")
+
+        # Transaction Analysis
+        st.subheader("📊 Transaction Trends")
+        fig = px.histogram(df, x="num_transactions_monthly", title="Distribution of Monthly Transactions")
+        st.plotly_chart(fig)
+
+    else:
+        st.warning("📂 Please upload banking data to view insights.")
+
+# --- SECTION 4: AI Chat Assistant ---
 if selected_section == "🤖 AI Chat Assistant":
     st.title("🤖 AI Chat Assistant (RAG)")
 
@@ -174,7 +198,7 @@ if selected_section == "🤖 AI Chat Assistant":
                 st.session_state.chat_history.append(("user", "🧑‍💼 You", user_question, timestamp))
                 st.session_state.chat_history.append(("ai", "🤖 AI", response.choices[0].message.content, timestamp))
 
-    # Display Chat History with Correct Icons
+    # Display Chat History
     st.subheader("📜 Chat History")
     for role, sender, message, timestamp in st.session_state.chat_history:
         with st.chat_message(role):
