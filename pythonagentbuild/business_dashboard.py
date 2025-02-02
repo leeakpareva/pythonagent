@@ -38,10 +38,12 @@ with st.sidebar:
         index=0
     )
 
+    # Move File Upload to Sidebar (Global Scope)
+    uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
+
 # --- SECTION 1: File Upload ---
 if selected_section == "📂 Upload Data":
     st.title("📂 Upload Business Data")
-    uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
 
     if uploaded_file:
         try:
@@ -84,6 +86,9 @@ if selected_section == "📊 Revenue Forecast":
 
         else:
             st.warning("The uploaded file must contain a 'Revenue' column.")
+
+    else:
+        st.warning("📂 Please upload a file first in the 'Upload Data' section.")
 
 # --- SECTION 3: AI Chat Assistant ---
 if selected_section == "💬 AI Chat Assistant":
