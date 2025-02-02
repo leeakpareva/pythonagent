@@ -27,52 +27,6 @@ def embed_text(text):
     )
     return np.array(response.data[0].embedding, dtype=np.float32)
 
-# Function to Rank & Retrieve Top Business Data
-from openai.embeddings_utils import cosine_similarity
-
-def get_most_relevant_data(query_vector, knowledge_base, top_n=3):
-    """Retrieve the most relevant business data based on similarity ranking."""
-    if len(knowledge_base) == 0:
-        return ["No relevant data available. Please upload a dataset."]
-    
-    similarities = [(cosine_similarity(query_vector, vec), text) for text, vec in knowledge_base.items()]
-    similarities = sorted(similarities, key=lambda x: x[0], reverse=True)  # Sort by highest similarity
-    return [text for _, text in similarities[:top_n]]  # Return top matches
-
-# Function to Generate AI Response
-def generate_ai_response(question, retrieved_data):
-    """Generates a structured AI response using retrieved business data."""
-    system_prompt = """
-    You are a business analyst. Use the retrieved data to provide structured insights:
-    
-    1️⃣ **Key Business Insights**
-    2️⃣ **Trend Analysis & Predictions**
-    3️⃣ **Actionable Strategies & Recommendations**
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Data: {retrieved_data}\n\nQuestion: {question}"}
-        ]
-    )
-    return response.choices[0].message.content
-
-# Function to Summarize Uploaded Data
-def summarize_uploaded_data(df):
-    """Summarizes uploaded business data and injects it into AI responses."""
-    summary_prompt = f"""
-    Summarize this business data with key trends, anomalies, and strategic insights:
-    {df.head(10).to_string(index=False)}
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": summary_prompt}]
-    )
-    return response.choices[0].message.content
-
 # --- UI Sidebar Navigation ---
 st.set_page_config(page_title="CEO Business Dashboard", layout="wide")
 
@@ -80,7 +34,7 @@ with st.sidebar:
     st.title("🔹 Navigation")
     selected_section = st.radio(
         "Go to:", 
-        ["📂 Upload Data", "📊 Revenue Forecast", "💬 AI Chat Assistant"],
+        ["📂 Upload Data", "📊 Revenue Forecast & KPIs", "💬 AI Chat Assistant"],
         index=0
     )
 
@@ -96,19 +50,13 @@ if selected_section == "📂 Upload Data":
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             st.success("✅ File uploaded successfully!")
             st.write(df.head())
-
-            # Summarize and Display Data Insights
-            summary = summarize_uploaded_data(df)
-            st.subheader("📊 Data Insights Summary")
-            st.write(summary)
-
         except Exception as e:
             st.error(f"❌ Failed to load Excel file. Error: {str(e)}")
 
-# --- SECTION 2: Revenue Forecast ---
-if selected_section == "📊 Revenue Forecast":
-    st.title("📊 Revenue Forecast")
-    
+# --- SECTION 2: Revenue Forecast & KPIs ---
+if selected_section == "📊 Revenue Forecast & KPIs":
+    st.title("📊 Revenue Forecast & Key Metrics")
+
     if uploaded_file:
         df = pd.read_excel(uploaded_file, engine="openpyxl")
         
@@ -127,10 +75,28 @@ if selected_section == "📊 Revenue Forecast":
             predicted_revenue = model.predict(future_months)
             forecast_df = pd.DataFrame({"Month": future_months.flatten(), "Predicted Revenue": predicted_revenue})
 
-            # Plot Forecast
-            fig = px.line(x=list(df["Month"]) + list(future_months.flatten()), 
-                          y=list(df["Revenue"]) + list(predicted_revenue), 
-                          labels={"x": "Month", "y": "Revenue"}, title="Revenue Trend & Forecast")
+            # --- KPI Section ---
+            st.subheader("📌 Key Performance Indicators (KPIs)")
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric("📈 Total Revenue", f"${df['Revenue'].sum():,.2f}")
+
+            with col2:
+                st.metric("📊 Highest Revenue Month", f"Month {df['Revenue'].idxmax()}")
+
+            with col3:
+                st.metric("📉 Average Monthly Revenue", f"${df['Revenue'].mean():,.2f}")
+
+            # --- Plot Forecast ---
+            st.subheader("📈 Revenue Forecast (Next 6 Months)")
+            fig = px.line(
+                x=list(df["Month"]) + list(future_months.flatten()), 
+                y=list(df["Revenue"]) + list(predicted_revenue), 
+                labels={"x": "Month", "y": "Revenue"},
+                title="Revenue Trend & Forecast",
+                markers=True
+            )
             fig.add_scatter(x=df["Month"], y=df["Revenue"], mode="markers", name="Actual Revenue")
             st.plotly_chart(fig)
 
@@ -152,9 +118,15 @@ if selected_section == "💬 AI Chat Assistant":
     if st.button("Ask AI"):
         if user_question:
             query_vector = embed_text(user_question)
-            retrieved_data = get_most_relevant_data(query_vector, knowledge_base, top_n=3)
-            response = generate_ai_response(user_question, retrieved_data)
+            retrieved_data = "No relevant data found in uploaded files." if index.ntotal == 0 else list(knowledge_base.keys())[0]
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Use the retrieved data below to answer questions."},
+                    {"role": "user", "content": f"{retrieved_data}\n\n{user_question}"}
+                ]
+            )
             st.subheader("🤖 AI Response:")
-            st.write(response)
+            st.write(response.choices[0].message.content)
         else:
             st.warning("Please enter a question before clicking 'Ask AI'.")
