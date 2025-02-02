@@ -7,6 +7,7 @@ import faiss
 import os
 import time
 from datetime import datetime
+from sklearn.ensemble import IsolationForest
 
 # Securely fetch OpenAI API key from Streamlit Secrets
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", None)
@@ -30,7 +31,7 @@ def embed_text(text):
     return np.array(response.data[0].embedding, dtype=np.float32)
 
 # --- Dark Mode & Theme Customization ---
-st.set_page_config(page_title="CEO Business Dashboard", layout="wide")
+st.set_page_config(page_title="AI Banking Assistant", layout="wide")
 
 # Dark Mode Toggle
 dark_mode = st.sidebar.checkbox("🌙 Enable Dark Mode")
@@ -52,11 +53,6 @@ theme_css = """
             background-color: #10B981 !important;
             color: white !important;
         }
-        .stChatMessage {
-            padding: 10px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-        }
     </style>
 """ if st.session_state.dark_mode else ""
 st.markdown(theme_css, unsafe_allow_html=True)
@@ -66,12 +62,12 @@ with st.sidebar:
     st.title("🔹 Navigation")
     selected_section = st.radio(
         "Go to:", 
-        ["📂 Upload Data", "📊 Revenue Forecast & KPIs", "🤖 AI Chat Assistant"],
+        ["📂 Upload Data", "🚨 Customer Service & Fraud Detection", "🤖 AI Chat Assistant"],
         index=0
     )
 
     # Move File Upload to Sidebar (Global Scope)
-    uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
+    uploaded_file = st.file_uploader("Upload an Excel file", type=["csv"])
 
     # Store the uploaded file in session state so it is accessible across all sections
     if uploaded_file:
@@ -82,17 +78,17 @@ def load_data():
     """Loads the uploaded file and stores it globally in session state."""
     if "uploaded_file" in st.session_state:
         try:
-            df = pd.read_excel(st.session_state["uploaded_file"], engine="openpyxl")
+            df = pd.read_csv(st.session_state["uploaded_file"])
             st.session_state["df"] = df
             return df
         except Exception as e:
-            st.error(f"❌ Failed to load Excel file. Error: {str(e)}")
+            st.error(f"❌ Failed to load CSV file. Error: {str(e)}")
             return None
     return None
 
 # --- SECTION 1: File Upload ---
 if selected_section == "📂 Upload Data":
-    st.title("📂 Upload Business Data")
+    st.title("📂 Upload Banking Data")
 
     df = load_data()  # Ensure data is loaded
 
@@ -100,56 +96,50 @@ if selected_section == "📂 Upload Data":
         st.success("✅ File uploaded successfully!")
         st.write(df.head())
 
-# --- SECTION 2: Revenue Forecast & KPIs ---
-if selected_section == "📊 Revenue Forecast & KPIs":
-    st.title("📊 Revenue Forecast & Key Metrics")
+# --- SECTION 2: Customer Service Issues & Fraud Detection ---
+if selected_section == "🚨 Customer Service & Fraud Detection":
+    st.title("🚨 AI-Powered Fraud Detection & Customer Issue Resolution")
 
     df = load_data()  # Ensure data is loaded
 
-    if df is not None and 'Revenue' in df.columns:
-        df = df.dropna(subset=['Revenue'])
-        df['Revenue'] = pd.to_numeric(df['Revenue'], errors='coerce')
-        df["Month"] = np.arange(len(df))
+    if df is not None and 'issue_type' in df.columns:
+        # Display Summary of Customer Service Issues
+        st.subheader("📊 Customer Complaints Summary")
+        issue_counts = df["issue_type"].value_counts()
+        st.bar_chart(issue_counts)
 
-        from sklearn.linear_model import LinearRegression
-        X = df[["Month"]]
-        y = df["Revenue"]
-        model = LinearRegression()
-        model.fit(X, y)
+        # AI Insights on Customer Complaints
+        st.subheader("🤖 AI Analysis of Customer Complaints")
+        complaints_summary_prompt = f"""
+        Analyze the following customer service issues and provide key trends:
+        {df[['issue_type', 'description']].head(10).to_string(index=False)}
+        """
 
-        future_months = np.arange(len(df), len(df) + 6).reshape(-1, 1)
-        predicted_revenue = model.predict(future_months)
-        forecast_df = pd.DataFrame({"Month": future_months.flatten(), "Predicted Revenue": predicted_revenue})
-
-        # --- KPI Section ---
-        st.subheader("📌 Key Performance Indicators (KPIs)")
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric("📈 Total Revenue", f"${df['Revenue'].sum():,.2f}")
-
-        with col2:
-            st.metric("📊 Highest Revenue Month", f"Month {df['Revenue'].idxmax()}")
-
-        with col3:
-            st.metric("📉 Average Monthly Revenue", f"${df['Revenue'].mean():,.2f}")
-
-        # --- Plot Forecast ---
-        st.subheader("📈 Revenue Forecast (Next 6 Months)")
-        fig = px.line(
-            x=list(df["Month"]) + list(future_months.flatten()), 
-            y=list(df["Revenue"]) + list(predicted_revenue), 
-            labels={"x": "Month", "y": "Revenue"},
-            title="Revenue Trend & Forecast",
-            markers=True
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": complaints_summary_prompt}]
         )
-        fig.add_scatter(x=df["Month"], y=df["Revenue"], mode="markers", name="Actual Revenue")
-        st.plotly_chart(fig)
 
-        st.write(forecast_df)
+        st.write(response.choices[0].message.content)
+
+        # Fraud Detection Using Isolation Forest
+        if 'account_balance' in df.columns and 'num_transactions_monthly' in df.columns:
+            st.subheader("🚨 Fraud Detection Model")
+
+            fraud_model = IsolationForest(contamination=0.05, random_state=42)
+            df['fraud_risk'] = fraud_model.fit_predict(df[['account_balance', 'num_transactions_monthly']])
+
+            fraud_cases = df[df['fraud_risk'] == -1]
+            st.warning(f"🚨 {len(fraud_cases)} Potential Fraud Cases Detected!")
+
+            if not fraud_cases.empty:
+                st.write(fraud_cases[['customer_id', 'full_name', 'account_balance', 'num_transactions_monthly']])
+
+        else:
+            st.error("❌ Fraud detection requires 'account_balance' and 'num_transactions_monthly' columns.")
 
     else:
-        st.warning("The uploaded file must contain a 'Revenue' column.")
+        st.warning("📂 Please upload a valid dataset with customer service issues.")
 
 # --- SECTION 3: AI Chat Assistant (Enhanced UI) ---
 if selected_section == "🤖 AI Chat Assistant":
@@ -162,7 +152,7 @@ if selected_section == "🤖 AI Chat Assistant":
         st.session_state.chat_history = []
 
     # User Input Box for Chat
-    user_question = st.text_input("💬 Ask a business-related question:")
+    user_question = st.text_input("💬 Ask a banking-related question:")
 
     if st.button("🚀 Ask AI"):
         if user_question and df is not None:
@@ -174,7 +164,7 @@ if selected_section == "🤖 AI Chat Assistant":
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": "Use the retrieved data below to answer questions."},
+                        {"role": "system", "content": "Use the retrieved banking data below to answer questions."},
                         {"role": "user", "content": f"{retrieved_data}\n\n{user_question}"}
                     ]
                 )
