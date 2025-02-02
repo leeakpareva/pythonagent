@@ -11,6 +11,7 @@ We have successfully developed and deployed a **RAG-powered AI Business Dashboar
 
 Draf UI <img width="944" alt="image" src="https://github.com/user-attachments/assets/59ea7cfa-5bc2-4302-b932-a6dfa26d9cb9" />
 <img width="955" alt="image" src="https://github.com/user-attachments/assets/923a524a-292a-434c-9b31-b7eea0d09b80" />
+<img width="959" alt="image" src="https://github.com/user-attachments/assets/c1782fc5-e4bb-4497-8d85-b4484d40fc12" />
 
 ---
 
