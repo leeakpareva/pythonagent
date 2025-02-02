@@ -6,9 +6,13 @@ import openai
 import faiss
 import os
 
-# Get OpenAI API key securely from Streamlit Secrets
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Securely fetch the OpenAI API key from Streamlit Secrets
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", None)
+
+if not OPENAI_API_KEY:
+    st.error("❌ OpenAI API key is missing. Please set it in Streamlit Secrets.")
+else:
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # FAISS Setup (Using OpenAI Embeddings)
 vector_dim = 1536  # OpenAI's text-embedding-ada-002 model dimension
@@ -31,8 +35,12 @@ st.write("Upload your business data, get revenue forecasts, and chat with your A
 uploaded_file = st.file_uploader("Upload an Excel file", type=["xlsx"])
 
 if uploaded_file:
-    # Load the data
-    df = pd.read_excel(uploaded_file)
+    # Try loading the Excel file with openpyxl
+    try:
+        df = pd.read_excel(uploaded_file, engine="openpyxl")
+    except Exception as e:
+        st.error(f"❌ Failed to load Excel file. Error: {str(e)}")
+        st.stop()
 
     # Display raw data
     st.subheader("📂 Uploaded Data Preview")
@@ -118,4 +126,3 @@ if st.button("Ask AI"):
         st.write(response.choices[0].message.content)
     else:
         st.warning("Please enter a question before clicking 'Ask AI'.")
-
