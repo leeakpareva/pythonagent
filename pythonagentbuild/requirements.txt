@@ -5,3 +5,4 @@ plotly
 openai
 faiss-cpu
 scikit-learn
+openpyxl
