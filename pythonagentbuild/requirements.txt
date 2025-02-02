@@ -6,3 +6,4 @@ openai
 faiss-cpu
 scikit-learn
 openpyxl
+pyyaml
