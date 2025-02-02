@@ -27,9 +27,33 @@ def embed_text(text):
     )
     return np.array(response.data[0].embedding, dtype=np.float32)
 
-# --- UI Sidebar Navigation ---
+# --- Dark Mode & Theme Customization ---
 st.set_page_config(page_title="CEO Business Dashboard", layout="wide")
 
+# Dark Mode Toggle
+dark_mode = st.sidebar.checkbox("🌙 Enable Dark Mode")
+theme_css = """
+    <style>
+        :root {
+            --background: #111827;
+            --foreground: #F9FAFB;
+            --primary: #10B981;
+            --secondary: #6B7280;
+            --accent: #6366F1;
+        }
+        .css-18e3th9, .css-1d391kg {
+            background-color: var(--background) !important;
+            color: var(--foreground) !important;
+        }
+        .stButton>button {
+            background-color: var(--primary) !important;
+            color: white !important;
+        }
+    </style>
+""" if dark_mode else ""
+st.markdown(theme_css, unsafe_allow_html=True)
+
+# --- UI Sidebar Navigation ---
 with st.sidebar:
     st.title("🔹 Navigation")
     selected_section = st.radio(
@@ -108,14 +132,18 @@ if selected_section == "📊 Revenue Forecast & KPIs":
     else:
         st.warning("📂 Please upload a file first in the 'Upload Data' section.")
 
-# --- SECTION 3: AI Chat Assistant ---
+# --- SECTION 3: AI Chat Assistant (Enhanced UI) ---
 if selected_section == "💬 AI Chat Assistant":
     st.title("💬 AI Chat Assistant (RAG)")
 
-    # Input Box for Chat
-    user_question = st.text_input("Ask a business-related question:")
-    
-    if st.button("Ask AI"):
+    # Store Chat History
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # User Input Box for Chat
+    user_question = st.text_input("💬 Ask a business-related question:")
+
+    if st.button("🚀 Ask AI"):
         if user_question:
             query_vector = embed_text(user_question)
             retrieved_data = "No relevant data found in uploaded files." if index.ntotal == 0 else list(knowledge_base.keys())[0]
@@ -126,7 +154,13 @@ if selected_section == "💬 AI Chat Assistant":
                     {"role": "user", "content": f"{retrieved_data}\n\n{user_question}"}
                 ]
             )
-            st.subheader("🤖 AI Response:")
-            st.write(response.choices[0].message.content)
-        else:
-            st.warning("Please enter a question before clicking 'Ask AI'.")
+            
+            # Store in chat history
+            st.session_state.chat_history.append(("🧑‍💼 You", user_question))
+            st.session_state.chat_history.append(("🤖 AI", response.choices[0].message.content))
+
+    # Display Chat History
+    st.subheader("📜 Chat History")
+    for sender, message in st.session_state.chat_history:
+        with st.chat_message(sender):
+            st.write(message)
