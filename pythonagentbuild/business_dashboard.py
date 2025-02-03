@@ -25,10 +25,17 @@ vector_dim = 1536  # OpenAI's text-embedding-ada-002 model dimension
 index = faiss.IndexFlatL2(vector_dim)
 knowledge_base = {}
 
-# --- Authentication Setup ---
-with open('credentials.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
+# --- Load Authentication Credentials Securely ---
+credentials_path = "credentials.yaml"
 
+if os.path.exists(credentials_path):
+    with open(credentials_path) as file:
+        config = yaml.load(file, Loader=SafeLoader)
+else:
+    st.error("❌ Authentication credentials not found. Please upload `credentials.yaml` to proceed.")
+    st.stop()
+
+# --- Authentication Setup ---
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
